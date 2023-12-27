@@ -18,11 +18,75 @@ exports.login = async (req, res) => {
         }
 
         if (user[0].password == password) {
-            // NOTIFICATION AND STATUS VIAJES
             // const [rows] = await connection.query(
-            //     'UPDATE reservations set status = 1 where  = ?',
-            //     [ticket_id]
+            //     `UPDATE reservations set status = 1 
+            //     WHERE departure_flight_id IN (SELECT flight_id
+            //                                 FROM flights
+            //                                 WHERE departure_date <= ?)`,
+            //     [new Date()]
             // );
+
+            // const [reservations] = await connection.query(
+            //     `SELECT 
+            //         r.*, 
+            //         df.departure_date AS departure_date
+            //     FROM 
+            //         reservations r
+            //         JOIN flights df ON r.departure_flight_id = df.flight_id
+            //     WHERE 
+            //         r.user_id = ?`, 
+            //     [user[0].user_id]
+            // );
+
+            // for(let i = 0; i < reservations.length; i++){
+            //     if( (new Date() - new Date(reservations[i].departure_date) ) == 1 ){
+            //         let notifications = await connection.query(
+            //             `INSERT INTO notifications (user_id, icon, title, description)
+            //             VALUES (?, 'alarm_outline', 'Reservation ID: ?', 'You have a pending flight on ?')
+            //             `,
+            //             [user[0].user_id, reservations[i].reservation_id, new Date(reservations[i].departure_date).toDateString()]
+            //         );
+            //     }
+            // }
+
+            const [rows] = await connection.query(
+                `UPDATE reservations SET status = 1 
+                WHERE departure_flight_id IN (
+                  SELECT flight_id
+                  FROM flights
+                  WHERE departure_date <= ?)`,
+                [new Date()]
+            );
+
+            const [reservations] = await connection.query(
+                `SELECT 
+                    r.*, 
+                    df.departure_date AS departure_date
+                FROM 
+                    reservations r
+                    JOIN flights df ON r.departure_flight_id = df.flight_id
+                WHERE 
+                    r.user_id = ?`,
+                [user[0].user_id]
+            );
+
+            for (let i = 0; i < reservations.length; i++) {
+                const departureDate = new Date(reservations[i].departure_date);
+                const currentDate = new Date();
+
+                const differenceInDays = Math.floor((departureDate - currentDate) / (1000 * 60 * 60 * 24));
+
+                if (differenceInDays >= 0 && differenceInDays <= 2) {
+                    const notification = await connection.query(
+                        `INSERT INTO notifications (user_id, icon, title, description)
+                    VALUES (?, 'alarm-outline', 'Reservation ID: ?', ?)`,
+                        [user[0].user_id, reservations[i].reservation_id, 
+                        'You have a pending flight on ' + new Date(reservations[i].departure_date).toISOString().slice(0, 19).replace('T', ' ')]
+                    );
+                }
+            }
+
+
             return res.json({ message: 'Login successfully!', user: user[0] });
         } else {
             return res.status(401).json({ error: 'Invalid credentials' });
@@ -66,8 +130,11 @@ exports.signup = async (req, res) => {
             'INSERT INTO users (firstname, lastname, phone, address, card, email, password) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [firstname, lastname, phone, address, card, email, password]
         );
-        //DEFAULT NOTIFICATION---------------------------------------------
-        ///////////////////////////////
+
+        const [notification] = await connection.query(
+            `INSERT INTO notifications values(?, 'airplane-outline', 'Welcome to Avianca!', 'Enjoy all about our flights that are unique for you!')`,
+            [result.insertId]
+        );
         return res.json(result);
     } catch (error) {
         console.error(error);
@@ -249,7 +316,6 @@ exports.getFlight = async (req, res) => {
             JOIN cities a ON f.destination_city_id = a.id
         WHERE
             f.flight_id = ?`, [flight_id]);
-        console.log("EL ID: ", rows[0]);
         res.json(rows[0]);
     } catch (error) {
         console.log(error);
@@ -440,7 +506,6 @@ exports.buyTicket = async (req, res) => {
     try {
         const user_id = req.params.user_id
         const { departure_flight_id, return_flight_id, adults, children, total } = req.body
-        console.log("re id: ", return_flight_id)
 
         const [rows] = await connection.query(
             'INSERT INTO reservations values (null, ?, ?, ?, ?, ?, ?, 0)',
@@ -502,7 +567,7 @@ exports.cancelTicket = async (req, res) => {
                     WHERE flight_id = ?`
             arguments = [adults, children, departure_flight_id]
         }
-        
+
         const [updated] = await connection.query(query, arguments);
 
         res.json(updated);
