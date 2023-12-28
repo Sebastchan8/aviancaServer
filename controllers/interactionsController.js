@@ -49,14 +49,18 @@ exports.login = async (req, res) => {
             //     }
             // }
 
+            const currentDate = new Date();
+            currentDate.setDate(currentDate.getDate() + 1);
+
             const [rows] = await connection.query(
                 `UPDATE reservations SET status = 1 
                 WHERE departure_flight_id IN (
-                  SELECT flight_id
-                  FROM flights
-                  WHERE departure_date <= ?)`,
-                [new Date()]
+                    SELECT flight_id
+                    FROM flights
+                    WHERE departure_date <= ?)`,
+                [currentDate]
             );
+
 
             const [reservations] = await connection.query(
                 `SELECT 
@@ -80,7 +84,7 @@ exports.login = async (req, res) => {
                     const notification = await connection.query(
                         `INSERT INTO notifications (user_id, icon, title, description)
                     VALUES (?, 'alarm-outline', 'Reservation ID: ?', ?)`,
-                        [user[0].user_id, reservations[i].reservation_id, 
+                        [user[0].user_id, reservations[i].reservation_id,
                         'You have a pending flight on ' + new Date(reservations[i].departure_date).toISOString().slice(0, 19).replace('T', ' ')]
                     );
                 }
@@ -145,19 +149,6 @@ exports.signup = async (req, res) => {
 
 //***********************FLIGHTS********************* */
 
-exports.getFlights = async (req, res) => {
-    try {
-        const [rows] = await connection.query(`
-            SELECT 
-                *
-            FROM flights`);
-        res.json(rows);
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('Getting flights error!');
-    }
-}
-
 exports.getCities = async (req, res) => {
     try {
         const [rows] = await connection.query(`
@@ -171,12 +162,124 @@ exports.getCities = async (req, res) => {
     }
 }
 
+exports.addFlight = async (req, res) => {
+    try {
+        const { aeroline_name, departure_city_id, destination_city_id, departure_date, destination_date,
+            adult_price, child_price, adult_available, child_available } = req.body
+        const [aeroline] = await connection.query(`
+            SELECT aeroline_id from aerolines WHERE aeroline_name = ?`,
+            [aeroline_name]);
+        const [rows] = await connection.query(`
+            INSERT INTO flights values(null, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [aeroline[0].aeroline_id, departure_city_id, destination_city_id, departure_date, destination_date,
+                adult_price, child_price, adult_available, child_available]);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Getting flights error!');
+    }
+}
+
+exports.updateFlight = async (req, res) => {
+    try {
+        const { flight_id, aeroline_name, departure_city_id, destination_city_id, departure_date, destination_date,
+            adult_price, child_price, adult_available, child_available } = req.body
+        const [aeroline] = await connection.query(`
+            SELECT aeroline_id from aerolines WHERE aeroline_name = ?`,
+            [aeroline_name]);
+        const [rows] = await connection.query(`
+            UPDATE flights
+            set aeroline_id = ?, departure_city_id = ?, destination_city_id = ?, departure_date = ?, destination_date = ?,
+            adult_price = ?, child_price = ?, adult_available = ?, child_available = ?
+            WHERE flight_id = ?`,
+            [aeroline[0].aeroline_id, departure_city_id, destination_city_id, departure_date, destination_date,
+                adult_price, child_price, adult_available, child_available, flight_id]);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Getting flights error!');
+    }
+}
+
+exports.deleteFlight = async (req, res) => {
+    try {
+        const flight_id = req.params.flight_id
+        const [rows] = await connection.query(`
+            DELETE FROM flights WHERE flight_id = ?`,
+            [flight_id]);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Getting flights error!');
+    }
+}
+
+exports.addCity = async (req, res) => {
+    try {
+        const { city, country, continent, img } = req.body
+        const [rows] = await connection.query(`
+            INSERT INTO cities values(null, ?, ?, ?, ?)`, [city, country, continent, img]);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Getting flights error!');
+    }
+}
+
+exports.updateCity = async (req, res) => {
+    try {
+        const { id, city, country, continent, img } = req.body
+        const [rows] = await connection.query(`
+            UPDATE cities
+            SET city = ?, country = ?, continent = ?, img = ?
+            WHERE id = ?`,
+            [city, country, continent, img, id]);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Getting flights error!');
+    }
+}
+
+exports.deleteCity = async (req, res) => {
+    try {
+        const city_id = req.params.city_id
+        const [rows] = await connection.query(`
+            DELETE FROM cities WHERE id = ?`,
+            [city_id]);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Getting flights error!');
+    }
+}
+
 exports.getAerolines = async (req, res) => {
     try {
         const [rows] = await connection.query(`
             SELECT 
                 *
             FROM aerolines`);
+        res.json(rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Getting flights error!');
+    }
+}
+
+exports.getFlights = async (req, res) => {
+    try {
+        const [rows] = await connection.query(`
+            SELECT 
+                f.*,
+                a.aeroline_name,
+                a.aeroline_img,
+                c1.city as departure_city,
+                c2.city as destination_city
+            FROM flights f, aerolines a, cities c1, cities c2
+            WHERE f.aeroline_id = a.aeroline_id
+            AND f.departure_city_id = c1.id
+            AND f.destination_city_id = c2.id`);
         res.json(rows);
     } catch (error) {
         console.log(error);
@@ -217,9 +320,10 @@ exports.getAvailableFlights = async (req, res) => {
                 JOIN cities d ON f.departure_city_id = d.id
                 JOIN cities a ON f.destination_city_id = a.id
             WHERE
-                f.departure_city_id = ?
-                OR f.destination_city_id = ?`
-            arguments = [departure_id, destination_id]
+                (f.departure_city_id = ?
+                OR f.destination_city_id = ?)
+                AND f.departure_date >= ?`
+            arguments = [departure_id, destination_id, new Date()]
         } else {
             query = `
                 SELECT
@@ -272,19 +376,6 @@ exports.getAvailableFlights = async (req, res) => {
             res.json({ flights: [], round: round });
         }
 
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('Getting flights error!');
-    }
-}
-
-exports.getFlights = async (req, res) => {
-    try {
-        const [rows] = await connection.query(`
-            SELECT 
-                *
-            FROM flights`);
-        res.json(rows);
     } catch (error) {
         console.log(error);
         res.status(500).send('Getting flights error!');
@@ -574,75 +665,5 @@ exports.cancelTicket = async (req, res) => {
     } catch (error) {
         console.log(error);
         res.status(500).send('Getting updated error!');
-    }
-}
-
-
-//--------
-
-
-
-
-exports.addChannel = async (req, res) => {
-    try {
-        const { username, email, password } = req.body;
-        const [rows] = await connection.query('INSERT INTO channels(username, email, password) VALUES (?, ?, ?)',
-            [username, email, password]);
-        res.send({ rows });
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('Saving channel error!');
-    }
-}
-
-exports.getChannel = async (req, res) => {
-    try {
-        const channelId = req.params.id;
-        const visitorChannelId = req.session.user.channel_id;
-
-        let subscription_status;
-        if (channelId == visitorChannelId) {
-            subscription_status = 0;
-        } else {
-            const [sub] = await connection.query(`
-                SELECT * FROM subscribers WHERE channel_id_main = ? AND channel_id_subscriber = ?`,
-                [channelId, visitorChannelId]);
-            if (sub.length === 0) {
-                subscription_status = -1;
-            } else {
-                subscription_status = 1;
-            }
-
-        }
-        const [rows] = await connection.query(`
-            SELECT 
-                c.*,
-                COUNT(DISTINCT s.subscription_id) num_subscribers,
-                COUNT(DISTINCT v.video_id) num_videos
-            FROM channels c
-            LEFT JOIN subscribers s ON c.channel_id = s.channel_id_main
-            LEFT JOIN videos v ON c.channel_id = v.channel_id
-            WHERE c.channel_id = ?
-            GROUP BY c.channel_id`,
-            [channelId]);
-        res.json([{ ...rows[0], subscription_status }]);
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('Getting channel error!');
-    }
-}
-
-exports.deleteChannel = async (req, res) => {
-    try {
-        const channel_id = req.session.user.channel_id
-        const [rows] = await connection.query('DELETE FROM channels WHERE channel_id = ?', [channel_id]);
-        const [rows2] = await connection.query('DELETE FROM comments WHERE channel_id = ?', [channel_id]);
-        const [rows3] = await connection.query('DELETE FROM ratings WHERE channel_id = ?', [channel_id]);
-        const [rows4] = await connection.query('DELETE FROM subscribers WHERE channel_id_subscriber = ?', [channel_id]);
-        const [rows5] = await connection.query('DELETE FROM videos WHERE channel_id = ?', [channel_id]);
-        res.json(rows);
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('Deleting channel error!');
     }
 }
