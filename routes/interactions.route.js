@@ -5,7 +5,6 @@ const interactionsController = require('../controllers/interactionsController');
 // /api/interactions/
 
 router.post('/login', interactionsController.login);
-router.get('/logout', interactionsController.logout);
 router.post('/signup', interactionsController.signup);
 
 

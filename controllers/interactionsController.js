@@ -18,36 +18,6 @@ exports.login = async (req, res) => {
         }
 
         if (user[0].password == password) {
-            // const [rows] = await connection.query(
-            //     `UPDATE reservations set status = 1 
-            //     WHERE departure_flight_id IN (SELECT flight_id
-            //                                 FROM flights
-            //                                 WHERE departure_date <= ?)`,
-            //     [new Date()]
-            // );
-
-            // const [reservations] = await connection.query(
-            //     `SELECT 
-            //         r.*, 
-            //         df.departure_date AS departure_date
-            //     FROM 
-            //         reservations r
-            //         JOIN flights df ON r.departure_flight_id = df.flight_id
-            //     WHERE 
-            //         r.user_id = ?`, 
-            //     [user[0].user_id]
-            // );
-
-            // for(let i = 0; i < reservations.length; i++){
-            //     if( (new Date() - new Date(reservations[i].departure_date) ) == 1 ){
-            //         let notifications = await connection.query(
-            //             `INSERT INTO notifications (user_id, icon, title, description)
-            //             VALUES (?, 'alarm_outline', 'Reservation ID: ?', 'You have a pending flight on ?')
-            //             `,
-            //             [user[0].user_id, reservations[i].reservation_id, new Date(reservations[i].departure_date).toDateString()]
-            //         );
-            //     }
-            // }
 
             const currentDate = new Date();
             currentDate.setDate(currentDate.getDate() + 1);
@@ -82,8 +52,8 @@ exports.login = async (req, res) => {
 
                 if (differenceInDays >= 0 && differenceInDays <= 2) {
                     const notification = await connection.query(
-                        `INSERT INTO notifications (user_id, icon, title, description)
-                    VALUES (?, 'alarm-outline', 'Reservation ID: ?', ?)`,
+                        `INSERT INTO notifications (notifications_id, user_id, icon, title, description)
+                    VALUES (null, ?, 'alarm-outline', 'Reservation ID: ?', ?)`,
                         [user[0].user_id, reservations[i].reservation_id,
                         'You have a pending flight on ' + new Date(reservations[i].departure_date).toISOString().slice(0, 19).replace('T', ' ')]
                     );
@@ -100,22 +70,6 @@ exports.login = async (req, res) => {
         res.status(500).json({ error: 'Log in failed' });
     }
 };
-
-exports.logout = async (req, res) => {
-    try {
-        req.session.destroy((err) => {
-            if (err) {
-                res.status(500).send('Log out failed');
-            } else {
-                res.json({ message: 'Logout successfully!' });
-            }
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Log out failed' });
-    }
-};
-
 
 exports.signup = async (req, res) => {
     try {
@@ -136,7 +90,7 @@ exports.signup = async (req, res) => {
         );
 
         const [notification] = await connection.query(
-            `INSERT INTO notifications values(?, 'airplane-outline', 'Welcome to Avianca!', 'Enjoy all about our flights that are unique for you!')`,
+            `INSERT INTO notifications values(null, ?, 'airplane-outline', 'Welcome to Avianca!', 'Enjoy all about our flights that are unique for you!')`,
             [result.insertId]
         );
         return res.json(result);
@@ -290,6 +244,7 @@ exports.getFlights = async (req, res) => {
 exports.getAvailableFlights = async (req, res) => {
     try {
         const { departure_id, destination_id, departure_date, destination_date, adults, children, round } = req.body
+        console.log({departure_id, destination_id, departure_date, destination_date, adults, children, round})
         let query, arguments
         if (departure_id == destination_id) {
             query = `
