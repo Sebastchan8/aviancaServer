@@ -1,4 +1,6 @@
 const connection = require('../config/db');
+const AESCipher = require('../config/AESCipher');
+const aesCipher = new AESCipher();
 
 //*********AUTHENTICATION */
 
@@ -17,7 +19,9 @@ exports.login = async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        if (user[0].password == password) {
+        const decryptedPassword = aesCipher.decrypt(user[0].password)
+
+        if (decryptedPassword == password) {
 
             const currentDate = new Date();
             currentDate.setDate(currentDate.getDate() + 1);
@@ -84,9 +88,11 @@ exports.signup = async (req, res) => {
             return res.status(400).json({ error: 'Email is already in use' });
         }
 
+        const encryptedPassword = aesCipher.encrypt(password)
+
         const [result] = await connection.query(
             'INSERT INTO users (firstname, lastname, phone, address, card, email, password) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [firstname, lastname, phone, address, card, email, password]
+            [firstname, lastname, phone, address, card, email, encryptedPassword]
         );
 
         const [notification] = await connection.query(
@@ -441,7 +447,10 @@ exports.getUserData = async (req, res) => {
             SELECT 
                 *
             FROM users WHERE user_id = ?`, [user_id]);
-        res.json(rows[0]);
+        const userObject = rows[0];
+        const decryptedPassword = aesCipher.decrypt(userObject.password)
+        userObject.password = decryptedPassword
+        res.json(userObject);
     } catch (error) {
         console.log(error);
         res.status(500).send('Getting flights error!');
@@ -477,11 +486,13 @@ exports.updateUserData = async (req, res) => {
             return res.status(400).json({ error: 'Email is already in use' });
         }
 
+        const encryptedPassword = aesCipher.encrypt(password)
+
         const [rows] = await connection.query(`
             UPDATE users 
             SET firstname = ?, lastname = ?, phone = ?, address = ?, card = ?, email = ?, password = ?
             WHERE user_id = ?`,
-            [firstname, lastname, phone, address, card, email, password, user_id]);
+            [firstname, lastname, phone, address, card, email, encryptedPassword, user_id]);
         res.json(rows[0]);
     } catch (error) {
         console.log(error);
