@@ -122,6 +122,27 @@ exports.getCities = async (req, res) => {
     }
 }
 
+exports.getRecommendedCities = async (req, res) => {
+    const user_id = req.params.user_id;
+
+    try {
+        const [rows] = await connection.query(`
+            SELECT DISTINCT cities.*
+            FROM reservations
+            JOIN flights ON reservations.departure_flight_id = flights.flight_id
+            OR reservations.return_flight_id = flights.flight_id
+            JOIN cities ON flights.departure_city_id = cities.id
+            OR flights.destination_city_id = cities.id
+            WHERE reservations.user_id = ?
+        `, [user_id]);
+
+        res.json({ cities: rows });
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Getting recommended cities error!');
+    }
+}
+
 exports.addFlight = async (req, res) => {
     try {
         const { aeroline_name, departure_city_id, destination_city_id, departure_date, destination_date,

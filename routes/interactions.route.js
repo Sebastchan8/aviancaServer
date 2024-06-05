@@ -18,6 +18,7 @@ router.put('/flights-crud', interactionsController.updateFlight);
 router.delete('/flights-crud/:flight_id', interactionsController.deleteFlight);
 
 router.get('/cities', interactionsController.getCities);
+router.get('/recommended-cities/:user_id', interactionsController.getRecommendedCities);
 router.post('/cities', interactionsController.addCity);
 router.put('/cities', interactionsController.updateCity);
 router.delete('/cities/:city_id', interactionsController.deleteCity);
