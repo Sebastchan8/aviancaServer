@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const mailScheduler = require('./mailer/mail_shceduler');
 
 const app = express();
 
@@ -13,5 +14,8 @@ app.get('/', (req, res) => {
 app.use('/api/interactions', require('./routes/interactions.route'));
 
 app.listen(3000, () => {
-    console.log('Server on port 3000...')
+    console.clear();
+    mailScheduler.scheduleMailNotification('*/5 * * * *');
+    console.log('Server on port 3000...');
+
 })
